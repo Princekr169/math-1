@@ -59,6 +59,28 @@
         button:hover {
             background-color: #0056b3;
         }
+        .correct {
+            color: green;
+            font-weight: bold;
+        }
+        .incorrect {
+            color: red;
+            font-weight: bold;
+        }
+        .tick::before {
+            content: '✔ ';
+            color: green;
+        }
+        .cross::before {
+            content: '✘ ';
+            color: red;
+        }
+        .attempted {
+            background-color: #e0ffe0;
+        }
+        .unattempted {
+            background-color: #ffe0e0;
+        }
     </style>
 </head>
 <body>
@@ -67,13 +89,13 @@
         <div class="timer" id="timer">Time left: <span id="time">20:00</span></div>
         <button onclick="prevQuestion()">Previous</button>
         <button onclick="nextQuestion()">Next</button>
-        <button onclick="submitQuiz()">Submit</button>
+        <button id="submit-btn" onclick="submitQuiz()">Submit</button>
         <div class="result" id="result"></div>
     </div>
 
     <script>
-       const questions = [
-    { question: "1. 5 + 3 का मान क्या है? / What is 5 + 3?", options: ["5", "7", "8", "9"], answer: 2 },
+        const questions = [
+             { question: "1. 5 + 3 का मान क्या है? / What is 5 + 3?", options: ["5", "7", "8", "9"], answer: 2 },
     { question: "2. 12 - 8 का मान क्या है? / What is 12 - 8?", options: ["4", "5", "6", "7"], answer: 0 },
     { question: "3. 6 x 7 का मान क्या है? / What is 6 x 7?", options: ["42", "36", "49", "40"], answer: 0 },
     { question: "4. 56 ÷ 8 का मान क्या है? / What is 56 ÷ 8?", options: ["6", "8", "7", "9"], answer: 2 },
@@ -127,23 +149,25 @@
     { question: "48. 15 + 20 - 10 का मान क्या है? / What is 15 + 20 - 10?", options: ["25", "20", "15", "30"], answer: 1 },
     { question: "49. 9 का वर्गमूल क्या है? / What is the square root of 9?", options: ["3", "4", "2", "5"], answer: 0 },
     { question: "50. 8 का घनमूल क्या है? / What is the cube root of 8?", options: ["2", "3", "4", "5"], answer: 0 }
-];
-
-
+        ];
 
         let currentQuestion = 0;
         let score = 0;
-        let timer;
+        let selectedAnswers = new Array(questions.length).fill(null);
         let timeLeft = 1200; // 20 minutes in seconds
+        let timer;
 
         // Load current question and options
         function loadQuestion() {
             if (currentQuestion < questions.length) {
+                const question = questions[currentQuestion];
+                const selected = selectedAnswers[currentQuestion];
+
                 document.getElementById('quiz').innerHTML = `
-                    <div class="question">${questions[currentQuestion].question}</div>
+                    <div class="question">${question.question}</div>
                     <ul class="options">
-                        ${questions[currentQuestion].options.map((option, index) => `
-                            <li><label><input type="radio" name="option" value="${index}"> ${option}</label></li>
+                        ${question.options.map((option, index) => `
+                            <li><label><input type="radio" name="option" value="${index}" ${selected === index ? 'checked' : ''}> ${option}</label></li>
                         `).join('')}
                     </ul>
                 `;
@@ -175,38 +199,62 @@
 
         // Move to the next question
         function nextQuestion() {
-            const selectedOption = document.querySelector('input[name="option"]:checked');
-            if (selectedOption && parseInt(selectedOption.value) === questions[currentQuestion].answer) {
-                score++;
+            saveSelectedAnswer();
+            if (currentQuestion < questions.length - 1) {
+                currentQuestion++;
+                loadQuestion();
             }
-            currentQuestion++;
-            loadQuestion();
         }
 
         // Move to the previous question
         function prevQuestion() {
+            saveSelectedAnswer();
             if (currentQuestion > 0) {
                 currentQuestion--;
                 loadQuestion();
             }
         }
 
+        // Save selected answer
+        function saveSelectedAnswer() {
+            const selectedOption = document.querySelector('input[name="option"]:checked');
+            selectedAnswers[currentQuestion] = selectedOption ? parseInt(selectedOption.value) : null;
+        }
+
         // Submit quiz and show the result
         function submitQuiz() {
-            const selectedOption = document.querySelector('input[name="option"]:checked');
-            if (selectedOption && parseInt(selectedOption.value) === questions[currentQuestion].answer) {
-                score++;
-            }
+            saveSelectedAnswer();
+            clearInterval(timer);
             showResult();
+            document.querySelector('button[onclick="nextQuestion()"]').style.display = 'none';
+            document.querySelector('button[onclick="prevQuestion()"]').style.display = 'none';
+            document.getElementById('submit-btn').style.display = 'none';
         }
 
         // Display the final result
         function showResult() {
+            let attemptedCount = selectedAnswers.filter(answer => answer !== null).length;
+            score = selectedAnswers.filter((answer, index) => answer === questions[index].answer).length;
+
             document.getElementById('quiz').innerHTML = '';
             document.getElementById('timer').style.display = 'none';
-            let resultHTML = `You scored ${score} out of ${questions.length}<br><br>`;
+
+            let resultHTML = `You scored ${score} out of ${questions.length}<br>`;
+            resultHTML += `Questions Attempted: ${attemptedCount} out of ${questions.length}<br><br>`;
             questions.forEach((q, index) => {
-                resultHTML += `Q${index + 1}: ${q.question}<br>Correct Answer: ${q.options[q.answer]}<br><br>`;
+                const isAttempted = selectedAnswers[index] !== null;
+                const className = isAttempted ? 'attempted' : 'unattempted';
+                resultHTML += `<div class="question ${className}">Q${index + 1}: ${q.question}</div><ul class="options">`;
+                q.options.forEach((option, optionIndex) => {
+                    let classOption = '';
+                    if (optionIndex === q.answer) {
+                        classOption = 'correct tick';
+                    } else if (selectedAnswers[index] === optionIndex) {
+                        classOption = 'incorrect cross';
+                    }
+                    resultHTML += `<li class="${classOption}">${option}</li>`;
+                });
+                resultHTML += `</ul><br>`;
             });
             document.getElementById('result').innerHTML = resultHTML;
         }
